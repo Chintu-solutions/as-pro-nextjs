@@ -1,0 +1,123 @@
+# Next.js Continuous Deployment Workflow
+# ===============================
+#
+# This workflow automates the deployment of a Next.js application to a self-hosted Ubuntu server.
+#
+# Prerequisites:
+# -------------
+# 1. GitHub Repository Secrets:
+#    - [ENV]_SERVER: Server IP/domain (e.g., DEV_SERVER, PROD_SERVER)
+#    - [ENV]_USER: SSH username (e.g., DEV_USER, PROD_USER)
+#    - [ENV]_KEY: SSH private key (e.g., DEV_KEY, PROD_KEY)
+#    - [ENV]_NGINX: Nginx configuration (e.g., DEV_NGINX, PROD_NGINX)
+#
+# 2. GitHub Repository Variables:
+#    - APP_NAME: Project name (no spaces)
+#    - COMPONENT_NAME: Component identifier (e.g., frontend)
+#
+# 3. Server Requirements:
+#    - Node.js 18+
+#    - PM2 installed globally
+#    - Nginx installed and configured
+#    - Yarn package manager
+#
+# Deployment Flow:
+# --------------
+# 1. Triggers on:
+#    - Push to 'child' branch
+#    - Manual workflow dispatch with environment selection
+# 2. Builds the Next.js application
+# 3. Transfers files to server
+# 4. Configures Nginx
+# 5. Restarts services
+#
+# Author: M Adnan Ajmal
+# Last Updated: 2024-02-02
+
+name: "Next.js CD"
+
+env:
+  APP_NAME: ${{ vars.APP_NAME }}
+  COMPONENT_NAME: ${{ vars.COMPONENT_NAME }}
+  RELEASE_PATH: /root/${{ vars.APP_NAME }}/${{ github.event_name == 'push' && 'dev' || github.event.inputs.environment }}/${{ vars.COMPONENT_NAME }}
+  NODE_ENV: ${{ github.event_name == 'push' && 'dev' || github.event.inputs.environment }}
+
+on:
+  push:
+    branches:
+      - child
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (dev, prod)"
+        type: choice
+        options:
+          - dev
+          - prod
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 20
+
+      - name: Install deps and build project
+        run: |
+          yarn install
+          CI= yarn run build
+
+      - name: Transfer files to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets[format('{0}_SERVER', env.NODE_ENV)] }}
+          username: ${{ secrets[format('{0}_USER', env.NODE_ENV)] }}
+          key: ${{ secrets[format('{0}_KEY', env.NODE_ENV)] }}
+          rm: true
+          source: ".next,public,package.json,yarn.lock"
+          target: ${{ env.RELEASE_PATH }}
+
+      - name: Deploy and restart services
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets[format('{0}_SERVER', env.NODE_ENV)] }}
+          username: ${{ secrets[format('{0}_USER', env.NODE_ENV)] }}
+          key: ${{ secrets[format('{0}_KEY', env.NODE_ENV)] }}
+          script: |
+            # Enable error handling
+            set -e
+
+            # Change to release directory
+            cd ${{ env.RELEASE_PATH }}
+
+            # Install production dependencies
+            yarn install --production
+
+            # Save Nginx configuration
+            mkdir -p .next
+            cat << 'EOL' > .next/nginx.conf
+            ${{ secrets[format('{0}_NGINX', env.NODE_ENV)] }}
+            EOL
+
+            # Verify nginx.conf exists and has content
+            if [ ! -s .next/nginx.conf ]; then
+              echo "Error: nginx.conf is empty or missing"
+              exit 1
+            fi
+
+            # Test and reload Nginx
+            sudo nginx -t && sudo systemctl restart nginx
+
+            # Manage PM2 process
+            if pm2 describe "${{ env.APP_NAME }}-${{ env.COMPONENT_NAME }}" > /dev/null; then
+              pm2 restart "${{ env.APP_NAME }}-${{ env.COMPONENT_NAME }}"
+            else
+              pm2 start yarn --name "${{ env.APP_NAME }}-${{ env.COMPONENT_NAME }}" -- start
+            fi
