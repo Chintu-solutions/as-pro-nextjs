@@ -1,23 +1,18 @@
-import {
-  JSXElementConstructor,
-  Key,
-  PromiseLikeOfReactNode,
-  ReactElement,
-  ReactNode,
-  ReactPortal,
-  useState,
-} from "react";
+"use client";
+
+import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AlertCircle, Copy, CheckCircle, ExternalLink } from "lucide-react";
-import {
+import type {
   VerificationMethod,
   VerificationDetails,
-  DNSRecord,
   FileVerification,
+  FileDetails,
+  DNSRecord,
+  DNSDetails,
 } from "@/types/website";
-import { workerData } from "node:worker_threads";
 
 interface VerificationInstructionsProps {
   method: VerificationMethod;
@@ -251,51 +246,93 @@ export function VerificationInstructions({
   domain,
   details,
 }: VerificationInstructionsProps) {
-  console.log("VerificationInstructions props:", { method, domain, details });
+  console.log("Verification Props:", { method, domain, details });
 
-  if (!details) {
-    return <p className="text-red-500">Verification details not available.</p>;
-  }
-
+  // For DNS method
   if (method === "dns") {
+    console.log("DNS Method Selected");
+    console.log("DNS Details:", details);
+
+    // Type guard to check if details matches DNSDetails structure
+    const isDNSDetails = (details: any): details is DNSDetails => {
+      return (
+        details &&
+        typeof details.type === "string" &&
+        typeof details.host === "string" &&
+        typeof details.value === "string" &&
+        method === "dns"
+      );
+    };
+
+    if (isDNSDetails(details)) {
+      // Create the properly typed DNSRecord
+      const dnsRecord: DNSRecord = {
+        type: details.type,
+        name: details.host,
+        value: details.value,
+      };
+
+      console.log("Mapped DNS Record:", dnsRecord);
+      return <DNSInstructions record={dnsRecord} domain={domain} />;
+    }
+
+    console.log("DNS Record is missing or invalid");
     return (
-      <div className="bg-gray-100 p-4 rounded-md">
-        <h2 className="text-lg font-semibold">DNS Verification Instructions</h2>
-        <p>Add the following TXT record to your DNS settings:</p>
-        <div className="mt-2 p-2 bg-white border rounded">
-          <p>
-            <strong>Host/Name:</strong> {details.host}
-          </p>
-          <p>
-            <strong>Value/Content:</strong> {details.value}
-          </p>
-        </div>
-        <ul className="mt-4 text-sm list-disc list-inside">
-          {details.instructions.map(
-            (
-              instruction:
-                | string
-                | number
-                | boolean
-                | ReactElement<any, string | JSXElementConstructor<any>>
-                | Iterable<ReactNode>
-                | ReactPortal
-                | PromiseLikeOfReactNode
-                | null
-                | undefined,
-              index: Key | null | undefined
-            ) => (
-              <li key={index}>{instruction}</li>
-            )
-          )}
-        </ul>
-      </div>
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          DNS verification details are missing. Please try again.
+        </AlertDescription>
+      </Alert>
     );
   }
 
-  if (method === "file" && details.file) {
-    return <FileInstructions file={details.file} domain={domain} />;
+  // For File method
+  if (method === "file") {
+    console.log("File Method Selected");
+    console.log("File Details:", details);
+
+    // Type guard for file details
+    const isFileDetails = (details: any): details is FileDetails => {
+      return (
+        details &&
+        typeof details.path === "string" &&
+        typeof details.content === "string" &&
+        method === "file"
+      );
+    };
+
+    if (isFileDetails(details)) {
+      // Map to expected file verification structure
+      const fileVerification: FileVerification = {
+        path: details.path,
+        content: details.content,
+        fullUrl: `https://${domain}${details.path}`,
+      };
+
+      console.log("Mapped File Verification:", fileVerification);
+      return <FileInstructions file={fileVerification} domain={domain} />;
+    }
+
+    console.log("File details are missing");
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          File verification details are missing. Please try again.
+        </AlertDescription>
+      </Alert>
+    );
   }
 
-  return <p className="text-red-500">Invalid verification method.</p>;
+  console.log("Invalid method or unhandled case:", { method, details });
+  return (
+    <Alert variant="destructive">
+      <AlertCircle className="h-4 w-4" />
+      <AlertDescription>
+        Invalid verification method. Please select either DNS or File
+        verification.
+      </AlertDescription>
+    </Alert>
+  );
 }

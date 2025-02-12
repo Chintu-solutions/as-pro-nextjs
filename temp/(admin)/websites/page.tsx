@@ -9,7 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { AddWebsiteModal } from "@/components/publisher/website/add-website-modal";
 import { AdCodeModal } from "@/components/publisher/website/ad-code-modal";
 import { Badge } from "@/components/ui/badge";
 import { Globe, Plus, Code } from "lucide-react";
@@ -103,15 +102,6 @@ export default function WebsitesPage() {
           </Card>
         ))}
       </div>
-
-      <AddWebsiteModal
-        open={showAddWebsite}
-        onClose={() => setShowAddWebsite(false)}
-        onSubmit={(data) => {
-          console.log("Website added:", data);
-          setShowAddWebsite(false);
-        }}
-      />
 
       <AdCodeModal
         open={showAdCode}

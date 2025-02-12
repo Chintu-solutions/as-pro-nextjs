@@ -13,6 +13,23 @@ export const WEBSITE_CATEGORIES = [
   'other',
 ] as const;
 
+
+export interface DNSDetails {
+  method: "dns";
+  type: string;
+  host: string;
+  value: string;
+  instructions: string[];
+}
+
+export interface FileDetails {
+  method: 'file';
+  filename: string;
+  path: string;
+  content: string;
+  instructions: string[];
+}
+
 export const WEBSITE_STATUSES = ['pending', 'active', 'rejected'] as const;
 export const VERIFICATION_METHODS = ['dns', 'file'] as const;
 export const UI_VERIFICATION_STATUSES = [

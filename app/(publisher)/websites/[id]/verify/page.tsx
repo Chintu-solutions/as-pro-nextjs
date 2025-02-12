@@ -1,20 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import dynamic from "next/dynamic";
+import { useState, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
-import {
-  VerificationMethod,
-  VerificationInstructions,
-  VerificationStatus,
-} from "@/components/publisher/website";
+// Dynamic imports to prevent SSR issues
+const Progress = dynamic(
+  () => import("@/components/ui/progress").then((mod) => mod.Progress),
+  { ssr: false }
+);
+const VerificationMethod = dynamic(
+  () =>
+    import("@/components/publisher/website").then(
+      (mod) => mod.VerificationMethod
+    ),
+  { ssr: false }
+);
+
+const VerificationInstructions = dynamic(
+  () =>
+    import("@/components/publisher/website").then(
+      (mod) => mod.VerificationInstructions
+    ),
+  { ssr: false }
+);
+
+const VerificationStatus = dynamic(
+  () =>
+    import("@/components/publisher/website").then(
+      (mod) => mod.VerificationStatus
+    ),
+  { ssr: false }
+);
 
 import type {
   Website,
@@ -78,12 +101,14 @@ function ErrorDisplay({ message }: { message: string }) {
 }
 
 function ProgressIndicator({ currentStep }: { currentStep: number }) {
-  const progressPercentage =
-    ((currentStep + 1) / VERIFICATION_STEPS.length) * 100;
-
   return (
     <div className="mb-8">
-      <Progress value={progressPercentage} className="mb-4" />
+      <Suspense fallback={<div className="h-4 bg-muted rounded" />}>
+        <Progress
+          value={((currentStep + 1) / VERIFICATION_STEPS.length) * 100}
+          className="mb-4"
+        />
+      </Suspense>
       <div className="grid grid-cols-3 gap-4">
         {VERIFICATION_STEPS.map((step, index) => (
           <div
@@ -116,14 +141,14 @@ export default function VerificationPage({ params }: VerificationPageProps) {
     }
   );
 
-  // Fetch website data with proper typing
   const { data: response, error: websiteError } = useSWR<
     ApiResponse<Website>,
     WebsiteApiError
-  >(`/websites/${params.id}`, () => websiteApi.getWebsite(params.id));
+  >(params.id ? `/websites/${params.id}` : null, () =>
+    websiteApi.getWebsite(params.id)
+  );
 
   const { currentStep, method, details, status, error } = verificationState;
-
   const handleMethodSelect = async (selectedMethod: VerificationMethodType) => {
     try {
       setVerificationState((prev) => ({
