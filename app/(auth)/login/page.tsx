@@ -8,6 +8,7 @@ import { Loader2, Mail, Lock, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import ForgetPass from "@/components/publisher/modals/ForgotPass";
 import { authApi } from "@/lib/api/publisher/auth";
 import {
   Card,
@@ -95,12 +96,12 @@ export default function LoginPage() {
       {/* Left Side - Hero Section */}
       <div className="relative hidden h-full flex-col bg-muted p-10 text-white dark:border-r lg:flex">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-purple-600" />
-        <div className="absolute inset-0 bg-[url('/admin-login.png')] bg-cover bg-center bg-no-repeat mix-blend-overlay opacity-10" />
+        <div className="absolute inset-0 bg-[url('/img/admin-login.png')] bg-cover bg-center bg-no-repeat mix-blend-overlay opacity-10" />
 
         {/* Logo Section */}
         <div className="relative z-20 flex items-center text-lg font-medium">
           <Zap className="mr-2 h-6 w-6 animate-pulse" />
-          <span className="text-2xl font-bold">TrafficPro</span>
+          <span className="text-2xl font-bold">AdsPro</span>
         </div>
 
         {/* Testimonial Section */}
@@ -210,6 +211,7 @@ export default function LoginPage() {
                 </Button>
 
                 <div className="grid gap-2 text-center text-sm">
+                  <ForgetPass />
                   <div className="text-muted-foreground">
                     Don&apos;t have an account?{" "}
                     <div className="text-sm text-center text-muted-foreground">

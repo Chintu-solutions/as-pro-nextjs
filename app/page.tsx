@@ -54,7 +54,7 @@ export default function Home() {
                 Login
               </Button>
             </Link>
-            <Link href="/register">
+            <Link href="/signup">
               <Button className="text-base px-6 py-2 h-12 bg-gradient-main text-white hover-button animate-fade-in">
                 Get Started
               </Button>
