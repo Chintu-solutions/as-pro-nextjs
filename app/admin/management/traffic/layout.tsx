@@ -1,5 +1,5 @@
-import { Sidebar } from "@/components/dashboard/sidebar";
-import { Header } from "@/components/dashboard/header";
+import { Sidebar } from "@/components/common/sidebar";
+import { Header } from "@/components/common/header";
 
 export default function TrafficManagementLayout({
   children,

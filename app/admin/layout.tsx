@@ -1,5 +1,5 @@
-import { Sidebar } from "@/components/dashboard/sidebar";
-import { Header } from "@/components/dashboard/header";
+import { Sidebar } from "@/components/common/sidebar";
+import { Header } from "@/components/common/header";
 
 export default function AdminLayout({
   children,
@@ -8,11 +8,11 @@ export default function AdminLayout({
 }) {
   // Get the current URL path segments
   const segments = new URL(
-    typeof window !== 'undefined' ? window.location.href : 'http://localhost'
-  ).pathname.split('/');
+    typeof window !== "undefined" ? window.location.href : "http://localhost"
+  ).pathname.split("/");
 
   // Check if we're in the login page
-  const isLoginPage = segments.includes('login');
+  const isLoginPage = segments.includes("login");
 
   // If it's a login page, don't show the sidebar and header
   if (isLoginPage) {

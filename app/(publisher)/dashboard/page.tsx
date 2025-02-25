@@ -1,8 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Overview } from "@/components/dashboard/overview";
-import { RecentActivity } from "@/components/dashboard/recent-activity";
+import { RecentActivity } from "@/components/common/recent-activity";
 import { DollarSign, Users, Globe, TrendingUp } from "lucide-react";
 
 export default function PublisherDashboard() {
@@ -70,9 +69,6 @@ export default function PublisherDashboard() {
           <CardHeader>
             <CardTitle>Earnings Overview</CardTitle>
           </CardHeader>
-          <CardContent>
-            <Overview />
-          </CardContent>
         </Card>
         <Card className="col-span-3">
           <CardHeader>

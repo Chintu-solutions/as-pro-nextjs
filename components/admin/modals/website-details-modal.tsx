@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,52 +31,85 @@ import {
   Lock,
   Unlock,
   ExternalLink,
+  AlertOctagon,
+  ShieldCheck,
 } from "lucide-react";
+import { websiteApi } from "@/lib/api/admin/website";
+import { toast } from "sonner";
+import type { Website } from "@/types/website";
 
 interface WebsiteDetailsModalProps {
   open: boolean;
   onClose: () => void;
-  website: {
-    id: string;
-    url: string;
-    publisher: string;
-    category: string;
-    traffic: number;
-    earnings: number;
-    status: "active" | "pending" | "suspended";
-    lastChecked: string;
-  };
+  website: Website;
+  onUpdate: () => void;
 }
 
-const performanceData = [
-  { date: "2024-03-20", traffic: 2400, earnings: 240 },
-  { date: "2024-03-21", traffic: 1398, earnings: 139 },
-  { date: "2024-03-22", traffic: 9800, earnings: 980 },
-  { date: "2024-03-23", traffic: 3908, earnings: 390 },
-  { date: "2024-03-24", traffic: 4800, earnings: 480 },
-  { date: "2024-03-25", traffic: 3800, earnings: 380 },
-  { date: "2024-03-26", traffic: 4300, earnings: 430 },
-];
+type ActionType = "suspend" | "delete" | "activate" | "verify" | "reject";
 
-export function WebsiteDetailsModal({ open, onClose, website }: WebsiteDetailsModalProps) {
+export function WebsiteDetailsModal({
+  open,
+  onClose,
+  website,
+  onUpdate,
+}: WebsiteDetailsModalProps) {
   const [loading, setLoading] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [actionType, setActionType] = useState<"suspend" | "delete" | "activate" | null>(null);
+  const [actionType, setActionType] = useState<ActionType | null>(null);
 
-  const handleAction = async (action: "suspend" | "delete" | "activate") => {
+  const handleAction = async (action: ActionType) => {
     setActionType(action);
     setShowConfirmation(true);
   };
 
   const confirmAction = async () => {
-    setLoading(true);
-    // Add action logic here based on actionType
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      setLoading(true);
+
+      switch (actionType) {
+        case "suspend":
+        case "activate":
+          await websiteApi.toggleStatus(website.id);
+          toast.success(
+            `Website \${actionType === "activate" ? "activated" : "suspended"} successfully`
+          );
+          break;
+
+        case "delete":
+          await websiteApi.deleteWebsite(website.id);
+          toast.success("Website deleted successfully");
+          break;
+
+        case "verify":
+          await websiteApi.manageVerification(website.id, "approve");
+          toast.success("Website verified successfully");
+          break;
+
+        case "reject":
+          await websiteApi.manageVerification(website.id, "reject");
+          toast.success("Website verification rejected");
+          break;
+      }
+
+      onUpdate();
       setShowConfirmation(false);
       setActionType(null);
       onClose();
-    }, 1000);
+    } catch (error) {
+      toast.error("Failed to perform action");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getVerificationStatus = () => {
+    if (website.verification?.isVerified) {
+      return <Badge variant="default">Verified</Badge>;
+    }
+    if (website.verification?.attempts > 0) {
+      return <Badge variant="destructive">Verification Attempted</Badge>;
+    }
+    return <Badge variant="secondary">Not Verified</Badge>;
   };
 
   return (
@@ -82,7 +120,7 @@ export function WebsiteDetailsModal({ open, onClose, website }: WebsiteDetailsMo
             <div className="flex items-center gap-2">
               <span>Website Details</span>
               <a
-                href={`https://${website.url}`}
+                href={`https://${website.domain}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-primary"
@@ -113,6 +151,10 @@ export function WebsiteDetailsModal({ open, onClose, website }: WebsiteDetailsMo
                   ? "Are you sure you want to suspend this website? All ads will be temporarily disabled."
                   : actionType === "delete"
                   ? "Are you sure you want to delete this website? This action cannot be undone."
+                  : actionType === "verify"
+                  ? "Are you sure you want to verify this website?"
+                  : actionType === "reject"
+                  ? "Are you sure you want to reject this website's verification?"
                   : "Are you sure you want to reactivate this website?"}
               </AlertDescription>
             </Alert>
@@ -125,7 +167,7 @@ export function WebsiteDetailsModal({ open, onClose, website }: WebsiteDetailsMo
                 Cancel
               </Button>
               <Button
-                variant="destructive"
+                variant={actionType === "delete" ? "destructive" : "default"}
                 onClick={confirmAction}
                 disabled={loading}
               >
@@ -137,7 +179,7 @@ export function WebsiteDetailsModal({ open, onClose, website }: WebsiteDetailsMo
           <Tabs defaultValue="overview" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="performance">Performance</TabsTrigger>
+              <TabsTrigger value="verification">Verification</TabsTrigger>
               <TabsTrigger value="settings">Settings</TabsTrigger>
             </TabsList>
 
@@ -150,20 +192,30 @@ export function WebsiteDetailsModal({ open, onClose, website }: WebsiteDetailsMo
                   <CardContent>
                     <dl className="grid grid-cols-2 gap-4">
                       <div>
-                        <dt className="text-sm font-medium text-muted-foreground">URL</dt>
-                        <dd>{website.url}</dd>
+                        <dt className="text-sm font-medium text-muted-foreground">
+                          Domain
+                        </dt>
+                        <dd>{website.domain}</dd>
                       </div>
                       <div>
-                        <dt className="text-sm font-medium text-muted-foreground">Publisher</dt>
-                        <dd>{website.publisher}</dd>
+                        <dt className="text-sm font-medium text-muted-foreground">
+                          Publisher ID
+                        </dt>
+                        <dd>{website.publisherId}</dd>
                       </div>
                       <div>
-                        <dt className="text-sm font-medium text-muted-foreground">Category</dt>
+                        <dt className="text-sm font-medium text-muted-foreground">
+                          Category
+                        </dt>
                         <dd>{website.category}</dd>
                       </div>
                       <div>
-                        <dt className="text-sm font-medium text-muted-foreground">Last Checked</dt>
-                        <dd>{website.lastChecked}</dd>
+                        <dt className="text-sm font-medium text-muted-foreground">
+                          Created At
+                        </dt>
+                        <dd>
+                          {new Date(website.createdAt).toLocaleDateString()}
+                        </dd>
                       </div>
                     </dl>
                   </CardContent>
@@ -208,53 +260,66 @@ export function WebsiteDetailsModal({ open, onClose, website }: WebsiteDetailsMo
               </div>
             </TabsContent>
 
-            <TabsContent value="performance">
+            <TabsContent value="verification">
               <Card>
                 <CardHeader>
-                  <CardTitle>Performance Metrics</CardTitle>
+                  <CardTitle>Verification Status</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={performanceData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="date"
-                          height={50}
-                          interval="preserveStartEnd"
-                          stroke="#888888"
-                          fontSize={12}
-                          tickLine={false}
-                          axisLine={false}
-                        />
-                        <YAxis
-                          width={80}
-                          interval="preserveStartEnd"
-                          stroke="#888888"
-                          fontSize={12}
-                          tickLine={false}
-                          axisLine={false}
-                        />
-                        <Tooltip 
-                          contentStyle={{ background: 'hsl(var(--background))', border: '1px solid hsl(var(--border))' }}
-                          labelStyle={{ color: 'hsl(var(--foreground))' }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="traffic"
-                          name="Traffic"
-                          stroke="hsl(var(--primary))"
-                          strokeWidth={2}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="earnings"
-                          name="Earnings"
-                          stroke="hsl(var(--chart-2))"
-                          strokeWidth={2}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center gap-4">
+                        {website.verification?.isVerified ? (
+                          <ShieldCheck className="h-8 w-8 text-green-500" />
+                        ) : (
+                          <AlertOctagon className="h-8 w-8 text-yellow-500" />
+                        )}
+                        <div>
+                          <p className="font-medium">Current Status</p>
+                          <p className="text-sm text-muted-foreground">
+                            {getVerificationStatus()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {website.verification?.attempts > 0 && (
+                      <div className="p-4 border rounded-lg">
+                        <p className="font-medium">Verification Attempts</p>
+                        <p className="text-sm text-muted-foreground">
+                          Total attempts: {website.verification.attempts}
+                        </p>
+                        {website.verification.lastAttempt && (
+                          <p className="text-sm text-muted-foreground">
+                            Last attempt:{" "}
+                            {new Date(
+                              website.verification.lastAttempt
+                            ).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      {!website.verification?.isVerified && (
+                        <Button
+                          variant="default"
+                          onClick={() => handleAction("verify")}
+                          className="flex-1"
+                        >
+                          <ShieldCheck className="h-4 w-4 mr-2" />
+                          Approve Verification
+                        </Button>
+                      )}
+                      <Button
+                        variant="destructive"
+                        onClick={() => handleAction("reject")}
+                        className="flex-1"
+                      >
+                        <AlertTriangle className="h-4 w-4 mr-2" />
+                        Reject Verification
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -269,28 +334,28 @@ export function WebsiteDetailsModal({ open, onClose, website }: WebsiteDetailsMo
                   <div className="space-y-4">
                     <div className="flex justify-between items-center p-4 border rounded-lg">
                       <div>
-                        <p className="font-medium">Ad Placement Restrictions</p>
-                        <p className="text-sm text-muted-foreground">Control where ads can appear</p>
+                        <p className="font-medium">Website Status</p>
+                        <p className="text-sm text-muted-foreground">
+                          {website.status.charAt(0).toUpperCase() +
+                            website.status.slice(1)}
+                        </p>
                       </div>
-                      <Button variant="outline" size="sm">
-                        Configure
-                      </Button>
-                    </div>
-                    <div className="flex justify-between items-center p-4 border rounded-lg">
-                      <div>
-                        <p className="font-medium">Content Categories</p>
-                        <p className="text-sm text-muted-foreground">Manage allowed ad categories</p>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        Edit
-                      </Button>
+                      <Badge
+                        variant={
+                          website.status === "active" ? "secondary" : "default"
+                        }
+                      >
+                        {website.status === "active" ? "Active" : "Inactive"}
+                      </Badge>
                     </div>
                     <div className="flex justify-between items-center p-4 border rounded-lg">
                       <div>
                         <p className="font-medium">Verification Status</p>
-                        <p className="text-sm text-muted-foreground">Website ownership verification</p>
+                        <p className="text-sm text-muted-foreground">
+                          Website ownership verification
+                        </p>
                       </div>
-                      <Badge variant="secondary">Verified</Badge>
+                      {getVerificationStatus()}
                     </div>
                   </div>
                 </CardContent>

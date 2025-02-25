@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,46 +14,61 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PublisherDetailsModal } from "@/components/admin/modals/publisher-details-modal";
-import { Search, Download } from "lucide-react";
-
-const publishers = [
-  {
-    id: "1",
-    name: "John Doe",
-    email: "john@example.com",
-    websites: 3,
-    totalEarnings: 12345.67,
-    status: "active",
-    joinDate: "2024-01-15",
-  },
-  {
-    id: "2",
-    name: "Jane Smith",
-    email: "jane@example.com",
-    websites: 2,
-    totalEarnings: 8901.23,
-    status: "pending",
-    joinDate: "2024-02-20",
-  },
-  {
-    id: "3",
-    name: "Bob Wilson",
-    email: "bob@example.com",
-    websites: 1,
-    totalEarnings: 4567.89,
-    status: "suspended",
-    joinDate: "2024-03-10",
-  },
-];
+import { Search, Download, Loader2, Eye } from "lucide-react";
+import { publisherApi } from "@/lib/api/admin/publisher";
+import type { Publisher } from "@/types/publishers";
+import { toast } from "sonner";
 
 export default function PublishersPage() {
-  const [selectedPublisher, setSelectedPublisher] = useState<any>(null);
+  const [publishers, setPublishers] = useState<Publisher[]>([]);
+  const [selectedPublisher, setSelectedPublisher] = useState<Publisher | null>(
+    null
+  );
   const [showDetails, setShowDetails] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const handleViewDetails = (publisher: any) => {
+  useEffect(() => {
+    loadPublishers();
+  }, []);
+
+  const loadPublishers = async (search?: string) => {
+    try {
+      const response = await publisherApi.getPublishers({
+        search,
+        limit: 10,
+        page: 1,
+      });
+      setPublishers(response.data.publishers);
+    } catch (error) {
+      toast.error(publisherApi.handleError(error));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    loadPublishers(value);
+  };
+
+  const handleViewDetails = (publisher: Publisher) => {
     setSelectedPublisher(publisher);
     setShowDetails(true);
   };
+
+  const handlePublisherUpdate = () => {
+    loadPublishers(searchTerm);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -75,6 +90,8 @@ export default function PublishersPage() {
                 <Input
                   placeholder="Search publishers..."
                   className="pl-8 w-[250px]"
+                  value={searchTerm}
+                  onChange={handleSearch}
                 />
               </div>
             </div>
@@ -86,45 +103,55 @@ export default function PublishersPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Websites</TableHead>
-                <TableHead>Total Earnings</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Join Date</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {publishers.map((publisher) => (
-                <TableRow key={publisher.id}>
-                  <TableCell className="font-medium">{publisher.name}</TableCell>
-                  <TableCell>{publisher.email}</TableCell>
-                  <TableCell>{publisher.websites}</TableCell>
-                  <TableCell>${publisher.totalEarnings.toFixed(2)}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        publisher.status === "active"
-                          ? "default"
-                          : publisher.status === "pending"
-                          ? "secondary"
-                          : "destructive"
-                      }
-                    >
-                      {publisher.status.charAt(0).toUpperCase() + publisher.status.slice(1)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{publisher.joinDate}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleViewDetails(publisher)}
-                    >
-                      View Details
-                    </Button>
+              {publishers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8">
+                    No publishers found
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                publishers.map((publisher) => (
+                  <TableRow key={publisher.id}>
+                    <TableCell className="font-medium">
+                      {publisher.name}
+                    </TableCell>
+                    <TableCell>{publisher.email}</TableCell>
+                    <TableCell>
+                      <Badge
+                        className={
+                          publisher.status === "active"
+                            ? "bg-gradient-to-r from-slate-900 to-indigo-900 hover:from-slate-800 hover:to-indigo-800"
+                            : publisher.status === "pending"
+                            ? "bg-yellow-500 hover:bg-yellow-600"
+                            : "bg-red-500 hover:bg-red-600"
+                        }
+                      >
+                        {publisher.status.charAt(0).toUpperCase() +
+                          publisher.status.slice(1)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(publisher.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        onClick={() => handleViewDetails(publisher)}
+                        className="bg-gradient-to-r from-slate-900 to-indigo-900 text-white hover:from-slate-800 hover:to-indigo-800 transition-all duration-200"
+                        size="sm"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Details
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -135,6 +162,7 @@ export default function PublishersPage() {
           open={showDetails}
           onClose={() => setShowDetails(false)}
           publisher={selectedPublisher}
+          onUpdate={handlePublisherUpdate}
         />
       )}
     </div>

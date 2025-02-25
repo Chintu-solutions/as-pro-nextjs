@@ -1,15 +1,15 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Overview } from "@/components/dashboard/overview";
-import { RecentActivity } from "@/components/dashboard/recent-activity";
+import { OverviewChart } from "@/components/common/overview-chart";
+import { RecentActivity } from "@/components/common/recent-activity";
 import { DollarSign, Users, Globe, TrendingUp } from "lucide-react";
 
 export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Dashboard Overview</h1>
-      
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -18,12 +18,16 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">$45,231.89</div>
-            <p className="text-xs text-muted-foreground">+20.1% from last month</p>
+            <p className="text-xs text-muted-foreground">
+              +20.1% from last month
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Publishers</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Active Publishers
+            </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -33,7 +37,9 @@ export default function AdminDashboard() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Websites</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Active Websites
+            </CardTitle>
             <Globe className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -48,7 +54,9 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">+24.5%</div>
-            <p className="text-xs text-muted-foreground">+4.5% from last month</p>
+            <p className="text-xs text-muted-foreground">
+              +4.5% from last month
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -59,7 +67,7 @@ export default function AdminDashboard() {
             <CardTitle>Revenue Overview</CardTitle>
           </CardHeader>
           <CardContent>
-            <Overview />
+            <OverviewChart />
           </CardContent>
         </Card>
         <Card className="col-span-3">

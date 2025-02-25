@@ -244,3 +244,78 @@ export interface WebsiteApiClient {
     }>>;
   };
 }
+export interface WebsiteStats {
+  traffic: {
+    date: string;
+    value: number;
+  }[];
+  earnings: {
+    date: string;
+    value: number;
+  }[];
+  total:number;
+  active: number;
+  pending: number;
+  verified: number;
+  performanceScore: number;
+  averageLoadTime: number;
+  bounceRate: number;
+}
+export interface WebsiteApiClient {
+  getWebsites: () => Promise<ApiResponse<Website[]>>;
+  getWebsite: (id: string) => Promise<ApiResponse<Website>>;
+  createWebsite: (data: CreateWebsiteRequest) => Promise<ApiResponse<Website>>;
+  updateWebsite: (id: string, data: UpdateWebsiteRequest) => Promise<ApiResponse<Website>>;
+  deleteWebsite: (id: string) => Promise<ApiResponse<void>>;
+  verification: {
+    initiate: (id: string, method: VerificationMethod) => Promise<VerificationResponse>;
+    checkStatus: (id: string) => Promise<VerificationCheckResponse>;
+  };
+  stats: {
+    getStats: () => Promise<ApiResponse<WebsiteStats>>;
+  };
+}
+export interface WebsiteFilters {
+  isVerified: any;
+  status?: Website['status'];
+  search?: string;
+  category?: string;
+  publisherId?: string;
+  sortBy?: 'status' | 'url' | 'traffic' | 'earnings' | 'lastChecked' | 'createdAt' | undefined;
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
+}
+
+export interface WebsiteUpdateData {
+  category?: string;
+  status?: Website['status'];
+  settings?: {
+    adPlacements?: string[];
+    contentCategories?: string[];
+  };
+}
+
+export interface WebsiteResponse {
+  success: boolean;
+  message?: string;
+  data?: Website;
+}
+
+export interface WebsitesListResponse {
+  success: boolean;
+  message?: string;
+  data: {
+    websites: Website[];
+    total: number;
+    page: number;
+    totalPages: number;
+  };
+}
+
+export interface WebsiteStatsResponse {
+  success: boolean;
+  message?: string;
+  data?: WebsiteStats;
+}
+

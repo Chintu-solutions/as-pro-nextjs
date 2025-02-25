@@ -1,211 +1,278 @@
-"use client";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import useSWR from "swr";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Globe, Plus } from "lucide-react";
-import { toast } from "sonner";
-
-import { AddWebsiteModal } from "@/components/publisher/website/add-website-modal";
-import { AdCodeModal } from "@/components/publisher/website/ad-code-modal";
-import { WebsiteCard } from "@/components/publisher/website/website-card";
-
+import axios from "axios";
 import type {
   Website,
-  CreateWebsiteRequest,
   ApiResponse,
+  CreateWebsiteRequest,
+  UpdateWebsiteRequest,
+  VerificationMethod,
+  VerificationResponse,
+  VerificationCheckResponse,
+  WebsiteStats,
 } from "@/types/website";
 
-import { websiteApi, WebsiteApiError } from "@/lib/api/publisher/website";
-
-interface EmptyStateProps {
-  onAddWebsite: () => void;
-}
-
-function EmptyState({ onAddWebsite }: EmptyStateProps) {
-  return (
-    <Card className="bg-muted/50">
-      <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-        <Globe className="h-12 w-12 text-muted-foreground mb-4" />
-        <h3 className="text-lg font-semibold mb-2">No Websites Added</h3>
-        <p className="text-muted-foreground mb-4">
-          Get started by adding your first website to implement ads
-        </p>
-        <Button onClick={onAddWebsite} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Your First Website
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
-
-function LoadingSkeleton() {
-  return (
-    <div className="space-y-4">
-      {[1, 2, 3].map((index) => (
-        <Card key={index} className="animate-pulse">
-          <CardContent className="p-6">
-            <div className="h-8 bg-muted rounded w-1/4 mb-2" />
-            <div className="h-4 bg-muted rounded w-1/2" />
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
-export default function WebsitesPage() {
-  const router = useRouter();
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showAdCodeModal, setShowAdCodeModal] = useState(false);
-  const [selectedWebsite, setSelectedWebsite] = useState<string | null>(null);
-
-  // Use SWR for data fetching with proper typing and data transformation
-  const {
-    data: response,
-    error,
-    mutate,
-  } = useSWR<ApiResponse<Website[]>, WebsiteApiError>("/websites", async () => {
-    const response = await websiteApi.getWebsites();
-    if (response.success && response.data) {
-      return {
-        ...response,
-        data: response.data.map((website) => ({
-          ...website,
-          id: website._id, // Ensure we always have id from _id
-        })),
-      };
+/**
+ * Custom error class for API errors
+ */
+export class WebsiteApiError extends Error {
+  constructor(
+    message: string,
+    public code: string = "UNKNOWN_ERROR",
+    public status: number = 500,
+    public details?: {
+      field?: string;
+      reason?: string;
+      suggestion?: string;
     }
-    return response;
-  });
+  ) {
+    super(message);
+    this.name = "WebsiteApiError";
+  }
+}
 
-  const handleAddWebsite = async (data: CreateWebsiteRequest) => {
+/**
+ * Website API client implementation for publishers
+ */
+export const websiteApi = {
+  /**
+   * Fetch all websites for the authenticated publisher
+   */
+  getWebsites: async () => {
     try {
-      const response = await websiteApi.createWebsite(data);
-
-      if (!response.success || !response.data) {
-        throw new Error(response.message || "Failed to add website");
-      }
-
-      // Update local data
-      await mutate();
-      setShowAddModal(false);
-      toast.success("Website added successfully");
-
-      // Get the website ID and navigate
-      const websiteId = response.data._id;
-      if (!websiteId) {
-        toast.error("Something went wrong. Please try again.");
-        return;
-      }
-
-      router.push(`/websites/${websiteId}/verify`);
+      const response = await axios.get<ApiResponse<Website[]>>(
+        "/publisher/websites"
+      );
+      return response.data;
     } catch (error) {
-      if (error instanceof WebsiteApiError) {
-        toast.error(error.message);
-      } else {
-        toast.error("Failed to add website");
+      if (axios.isAxiosError(error) && error.response?.data) {
+        throw new WebsiteApiError(
+          error.response.data.message || "Failed to fetch websites",
+          error.response.data.error?.code || "FETCH_ERROR",
+          error.response.status,
+          error.response.data.error?.details
+        );
       }
-      console.error("Error adding website:", error);
+      throw new WebsiteApiError("Failed to fetch websites", "FETCH_ERROR", 500);
     }
-  };
+  },
 
-  const handleViewScript = (websiteId: string) => {
-    if (!websiteId) {
-      toast.error("Invalid website selected");
-      return;
+  /**
+   * Fetch details for a specific website
+   */
+  getWebsite: async (id: string) => {
+    try {
+      const response = await axios.get<ApiResponse<Website>>(
+        `/publisher/websites/${id}`
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.data) {
+        throw new WebsiteApiError(
+          error.response.data.message || "Failed to fetch website details",
+          error.response.data.error?.code || "FETCH_ERROR",
+          error.response.status,
+          error.response.data.error?.details
+        );
+      }
+      throw new WebsiteApiError(
+        "Failed to fetch website details",
+        "FETCH_ERROR",
+        500
+      );
     }
-    setSelectedWebsite(websiteId);
-    setShowAdCodeModal(true);
-  };
+  },
 
-  const handleVerifyWebsite = (websiteId: string) => {
-    if (!websiteId) {
-      toast.error("Unable to verify website");
-      return;
+  /**
+   * Register a new website
+   */
+  createWebsite: async (data: CreateWebsiteRequest) => {
+    try {
+      const response = await axios.post<ApiResponse<Website>>(
+        "/publisher/websites",
+        data
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.data) {
+        throw new WebsiteApiError(
+          error.response.data.message || "Failed to create website",
+          error.response.data.error?.code || "CREATE_WEBSITE_ERROR",
+          error.response.status,
+          error.response.data.error?.details
+        );
+      }
+      throw new WebsiteApiError(
+        "Failed to create website",
+        "CREATE_WEBSITE_ERROR",
+        500
+      );
     }
-    router.push(`/websites/${websiteId}/verify`);
+  },
+
+  /**
+   * Update website settings
+   */
+  updateWebsite: async (id: string, data: UpdateWebsiteRequest) => {
+    try {
+      const response = await axios.put<ApiResponse<Website>>(
+        `/publisher/websites/${id}`,
+        data
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.data) {
+        throw new WebsiteApiError(
+          error.response.data.message || "Failed to update website",
+          error.response.data.error?.code || "UPDATE_ERROR",
+          error.response.status,
+          error.response.data.error?.details
+        );
+      }
+      throw new WebsiteApiError(
+        "Failed to update website",
+        "UPDATE_ERROR",
+        500
+      );
+    }
+  },
+
+  /**
+   * Delete a website (soft delete)
+   */
+  deleteWebsite: async (id: string) => {
+    try {
+      const response = await axios.delete<ApiResponse<void>>(
+        `/publisher/websites/${id}`
+      );
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.data) {
+        throw new WebsiteApiError(
+          error.response.data.message || "Failed to delete website",
+          error.response.data.error?.code || "DELETE_ERROR",
+          error.response.status,
+          error.response.data.error?.details
+        );
+      }
+      throw new WebsiteApiError(
+        "Failed to delete website",
+        "DELETE_ERROR",
+        500
+      );
+    }
+  },
+
+  /**
+   * Website verification methods
+   */
+  verification: {
+    /**
+     * Initialize website verification process
+     */
+    initiate: async (id: string, method: VerificationMethod) => {
+      try {
+        const response = await axios.post<VerificationResponse>(
+          `/publisher/websites/${id}/verification/initiate`,
+          { method }
+        );
+        return response.data;
+      } catch (error) {
+        if (axios.isAxiosError(error) && error.response?.data) {
+          throw new WebsiteApiError(
+            error.response.data.message || "Failed to initiate verification",
+            error.response.data.error?.code || "VERIFICATION_ERROR",
+            error.response.status,
+            error.response.data.error?.details
+          );
+        }
+        throw new WebsiteApiError(
+          "Failed to initiate verification",
+          "VERIFICATION_ERROR",
+          500
+        );
+      }
+    },
+
+    /**
+     * Check verification status
+     */
+    checkStatus: async (id: string) => {
+      try {
+        const response = await axios.post<VerificationCheckResponse>(
+          `/publisher/websites/${id}/verification/check`
+        );
+        return response.data;
+      } catch (error) {
+        if (axios.isAxiosError(error) && error.response?.data) {
+          throw new WebsiteApiError(
+            error.response.data.message ||
+              "Failed to check verification status",
+            error.response.data.error?.code || "VERIFICATION_CHECK_ERROR",
+            error.response.status,
+            error.response.data.error?.details
+          );
+        }
+        throw new WebsiteApiError(
+          "Failed to check verification status",
+          "VERIFICATION_CHECK_ERROR",
+          500
+        );
+      }
+    },
+  },
+
+  /**
+   * Website statistics
+   */
+  stats: {
+    /**
+     * Get publisher website statistics
+     */
+    getStats: async () => {
+      try {
+        const response = await axios.get<ApiResponse<WebsiteStats>>(
+          "/publisher/websites/stats"
+        );
+        return response.data;
+      } catch (error) {
+        if (axios.isAxiosError(error) && error.response?.data) {
+          throw new WebsiteApiError(
+            error.response.data.message || "Failed to fetch website statistics",
+            error.response.data.error?.code || "STATS_ERROR",
+            error.response.status,
+            error.response.data.error?.details
+          );
+        }
+        throw new WebsiteApiError(
+          "Failed to fetch website statistics",
+          "STATS_ERROR",
+          500
+        );
+      }
+    },
+  },
+};
+
+/**
+ * Type guard for API responses
+ */
+export function isSuccessResponse<T>(
+  response: ApiResponse<T>
+): response is ApiResponse<T> & { success: true; data: T } {
+  return response.success && !!response.data;
+}
+
+/**
+ * Type guard for verification responses
+ */
+export function isVerificationSuccess(
+  response: VerificationResponse
+): response is VerificationResponse & {
+  success: true;
+  data: {
+    verificationDetails: NonNullable<
+      VerificationResponse["data"]
+    >["verificationDetails"];
   };
-
-  // Handle error state
-  if (error) {
-    return (
-      <Card className="bg-destructive/10 p-6">
-        <p className="text-destructive">
-          {error instanceof WebsiteApiError
-            ? error.message
-            : "Failed to load websites"}
-        </p>
-      </Card>
-    );
-  }
-
-  // Handle loading state
-  if (!response) {
-    return <LoadingSkeleton />;
-  }
-
-  const websites = response.data || [];
-
-  return (
-    <div className="space-y-8">
-      {/* Header Section */}
-      <div className="flex justify-between items-center border-b pb-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">My Websites</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your registered websites and ad implementations
-          </p>
-        </div>
-        <Button
-          onClick={() => setShowAddModal(true)}
-          size="lg"
-          className="gap-2"
-        >
-          <Plus className="h-5 w-5" />
-          Add Website
-        </Button>
-      </div>
-
-      {/* Websites List */}
-      {websites.length === 0 ? (
-        <EmptyState onAddWebsite={() => setShowAddModal(true)} />
-      ) : (
-        <div className="grid gap-6">
-          {websites.map((website) => (
-            <WebsiteCard
-              key={website._id}
-              website={{
-                ...website,
-                id: website._id,
-              }}
-              onViewScript={() => handleViewScript(website._id)}
-              onVerify={() => handleVerifyWebsite(website._id)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Modals */}
-      <AddWebsiteModal
-        open={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSubmit={handleAddWebsite}
-      />
-
-      {selectedWebsite && (
-        <AdCodeModal
-          open={showAdCodeModal}
-          onClose={() => {
-            setShowAdCodeModal(false);
-            setSelectedWebsite(null);
-          }}
-          websiteId={selectedWebsite}
-        />
-      )}
-    </div>
-  );
+} {
+  return response.success && !!response.data?.verificationDetails;
 }
